@@ -129,7 +129,7 @@ This document outlines the detailed implementation plan for building the stream-
   - `src/components/StreamAnalyzer.tsx` - Main analysis component
   - `src/components/ResultsDisplay.tsx` - Results table display
   - `src/services/api.ts` - API client service
-- Add Realitech logo asset
+- Copy Realitech logo from `assets/images/realitech-logo.svg` to frontend public directory
 
 **Acceptance Criteria:**
 - `npm run dev` starts development server
@@ -302,7 +302,7 @@ This document outlines the detailed implementation plan for building the stream-
 
 **Tasks:**
 - Create `components/Header.tsx`:
-  - Realitech logo in top-left corner
+  - Realitech logo in top-left corner (source: `assets/images/realitech-logo.svg`)
   - App title "Stream-View"
   - Clean, professional styling with Tailwind
 - Create `components/StreamAnalyzer.tsx`:
@@ -324,7 +324,7 @@ This document outlines the detailed implementation plan for building the stream-
   - Professional color scheme
 
 **Acceptance Criteria:**
-- Realitech logo displayed in top-left
+- Realitech logo displayed in top-left (using `assets/images/realitech-logo.svg`)
 - Single-page layout (no routing required)
 - Modern, clean design using Tailwind CSS
 - URL input and "View" button clearly visible
@@ -627,7 +627,7 @@ This document outlines the detailed implementation plan for building the stream-
   ```
 - Create `tests/e2e/ui.spec.ts`:
   - Test: Page loads with correct layout
-  - Test: Realitech logo visible in top-left
+  - Test: Realitech logo visible in top-left (verify `realitech-logo.svg` is displayed)
   - Test: URL input and View button present
   - Test: URL validation works
   - Test: Error messages display correctly

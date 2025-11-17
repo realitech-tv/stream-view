@@ -11,7 +11,7 @@
 - [ ] It should be possible to build the application without any knowledge of the application code
 - [ ] The application should use a clean but modern user interface design
 - [ ] The web application should have one single page
-- [ ] The Realitech logotype should be present in the top left corner of the web page
+- [ ] The Realitech logotype should be present in the top left corner of the web page (source: `assets/images/realitech-logo.svg`)
 - [ ] There should be no authentication or login required to run the web application
 
 ## US-002 View HLS stream information
