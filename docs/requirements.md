@@ -31,8 +31,8 @@
 ## US-003 View DASH stream information
 
 **As a** streaming engineer
-**I want to** insert a URL to a HLS stream manifest into a text field and press a button called "View"
-**So that** I can view the details of the HLS stream
+**I want to** insert a URL to a DASH stream manifest into a text field and press a button called "View"
+**So that** I can view the details of the DASH stream
 
 ### Acceptance Criteria
 - [ ] The application should validate that the manifest is well-formed, including the suffix .mpd
@@ -44,12 +44,12 @@
 ## US-004 View SCTE information in stream
 
 **As a** streaming engineer
-**I want to** view inforrmation about SCTE-35 in the stream
+**I want to** view information about SCTE-35 in the stream
 **So that** I can see advertising-related information about the stream
 
 ### Acceptance Criteria
 - [ ] The SCTE information presented to the user should include:
-   - [ ] Splica commands
+   - [ ] Splice commands
    - [ ] PTS timestamp
    - [ ] Pre-roll time
    - [ ] Out-of-network indicator
@@ -105,6 +105,8 @@
 
 # Technical Requirements
  - [ ] It should be possible to run the application in a container, either using Docker or something similar.
+ - [ ] It should be possible to run the application without a container during development and test.
+ - [ ] All environment requirements and dependencies for a Macbook should be confirmed before the development starts.
 
 # Test requirements
 - [ ] All test data for stream manifest URLs should be saved in a separate file so that they can be updated without touching any code or test case.

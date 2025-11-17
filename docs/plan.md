@@ -192,7 +192,7 @@ This document outlines the detailed implementation plan for building the stream-
 - Add comprehensive error handling with specific error messages
 
 **Acceptance Criteria:**
-- Successfully parses BBC News HLS manifest (test data)
+- Successfully parses Freevee Euronews HLS manifest (test data)
 - Extracts all bitrate levels with resolution and codec info
 - Identifies audio tracks with language and name
 - Detects subtitle tracks
