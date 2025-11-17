@@ -89,11 +89,26 @@
    - [ ] Name of information item, e.g. "Resolution"
    - [ ] Value of parameter
 
+## US-006 Application operation
+
+**As a** Application operations engineer
+**I want to** have support maintaining the application
+**So that** I can deploy, start, stop and maintain the application
+
+### Acceptance Criteria
+- [ ] Appropriate documentation for deploying, starting and stopping the application must be available.
+- [ ] There should be documentation which describes the application structure, including file and folder structure.
+
 # User Interface Requirements
+- [ ] A modern-looking UI design should be used for the application.
 
 
 # Technical Requirements
- - [ ] It should be possible to run the application in a container, either using Docker or something similar
+ - [ ] It should be possible to run the application in a container, either using Docker or something similar.
+
+# Test requirements
+- [ ] All test data for stream manifest URLs should be saved in a separate file so that they can be updated without touching any code or test case.
+- [ ] There should be some basic UI testing using some framework like Playwrite to ensure the user interface design conforms to modern UI design standards.
  
 # Test Data
 The following URLs can be used for building tests of the application:
