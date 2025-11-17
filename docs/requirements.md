@@ -25,6 +25,7 @@
 - [ ] If the URL is not found or will not load, then a helpful error message should be presented to the user
 - [ ] When the user clicks the "View" button, then underneath the URL and View button, the following information about the stream should be presented:
   - [ ] The number of bitrates and information about each bitrate level
+  - [ ] Information about audio tracks, subtitles and thumbnails tracks
   - [ ] Information about any DRM encryption used in the stream
 
 ## US-003 View DASH stream information
@@ -37,15 +38,61 @@
 - [ ] The application should validate that the manifest is well-formed, including the suffix .mpd
 - [ ] When the user clicks the "View" button, then underneath the URL and View button, the following information about the stream should be presented:
   - [ ] The number of bitrates and information about each bitrate level
+  - [ ] Information about audio tracks, subtitles and thumbnails tracks
   - [ ] Information about any DRM encryption used in the stream
 
-  ## US-004 View SCTE information in stream
+## US-004 View SCTE information in stream
 
-  **As a** streaming engineer
-  **I want to** view inforrmation about SCTE-35 in the stream
-  **So that** I can see advertising-related information about the stream
+**As a** streaming engineer
+**I want to** view inforrmation about SCTE-35 in the stream
+**So that** I can see advertising-related information about the stream
 
- # Technical Requirements
+### Acceptance Criteria
+- [ ] The SCTE information presented to the user should include:
+   - [ ] Splica commands
+   - [ ] PTS timestamp
+   - [ ] Pre-roll time
+   - [ ] Out-of-network indicator
+   - [ ] Return indicator
+   - [ ] Unique Program ID (UPID)
+   - [ ] Segmentation descriptors
+   - [ ] Event ID
+   - [ ] Auto return flag
+   - [ ] Break duration
+
+
+## US-005 View information about the video content
+
+**As a** streaming engineer
+**I want to** view information about the video fragments
+**So that** I can see the details of the video stream
+
+### Acceptance Criteria
+- [ ] The information should include:
+    - [ ] Container format
+    - [ ] Fragment Duration
+    - [ ] Bitrate
+    - [ ] File size
+    - [ ] Codec
+    - [ ] Profile and Level
+    - [ ] Resolution
+    - [ ] Frame rate
+    - [ ] Bit rate
+    - [ ] Colour space
+- [ ] It should be possible to get the information no matter whether the video stream is encrypted for DRM or not.
+- [ ] The web application should download between one and ten video fragments for the analysis.
+- [ ] The information should be presented in a multi-column table with:
+   - [ ] Information item (e.g. "Codec")
+   - [ ] Value
+- [ ] For information such as video bitrate levels, use three columns with:
+   - [ ] Name or number of bitrate level
+   - [ ] Name of information item, e.g. "Resolution"
+   - [ ] Value of parameter
+
+# User Interface Requirements
+
+
+# Technical Requirements
  - [ ] It should be possible to run the application in a container, either using Docker or something similar
  
 # Test Data
