@@ -44,6 +44,26 @@ A web-based application for analyzing video streaming manifests. Stream-View pro
 docker-compose down
 ```
 
+### Production Deployment
+
+For production deployment without development volume mounts:
+
+```bash
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+To rebuild and deploy:
+
+```bash
+docker-compose -f docker-compose.prod.yml up --build -d
+```
+
+To stop production deployment:
+
+```bash
+docker-compose -f docker-compose.prod.yml down
+```
+
 ## Development Setup
 
 ### Backend (Python)
@@ -135,6 +155,42 @@ Both live streams and video-on-demand (VOD) are supported.
 ## Contributing
 
 See [Development Guidelines](.claude/guidelines.md) for code style and contribution standards.
+
+## Troubleshooting
+
+### Docker Compose not found
+
+If you see `command not found: docker-compose`, you may need to install Docker Compose:
+
+- **Docker Desktop users**: Docker Compose is included, try `docker compose` (with space) instead
+- **Linux users**: Install docker-compose separately: `sudo apt-get install docker-compose`
+- **Alternative**: Use the newer `docker compose` command (Docker 20.10+)
+
+### Port already in use
+
+If ports 80 or 8000 are already in use, you can modify the ports in `docker-compose.yml`:
+
+```yaml
+services:
+  frontend:
+    ports:
+      - "8080:80"  # Use port 8080 instead of 80
+  backend:
+    ports:
+      - "8001:8000"  # Use port 8001 instead of 8000
+```
+
+### Frontend can't connect to backend
+
+Make sure both containers are on the same network. The nginx configuration proxies `/api/` requests to `http://backend:8000`. If you're running services separately, update the `VITE_API_URL` environment variable.
+
+### Build failures
+
+If Docker build fails:
+
+1. Check Docker is running: `docker ps`
+2. Clear Docker cache: `docker system prune -a`
+3. Rebuild without cache: `docker-compose build --no-cache`
 
 ## License
 
