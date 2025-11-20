@@ -7,6 +7,8 @@ FastAPI application for analyzing HLS and DASH stream manifests.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from api.analyze import router as analyze_router
+
 app = FastAPI(
     title="Stream-View API",
     description="API for analyzing HLS and DASH stream manifests",
@@ -21,6 +23,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include API routers
+app.include_router(analyze_router)
 
 
 @app.get("/api/health")
