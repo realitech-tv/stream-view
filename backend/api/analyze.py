@@ -4,6 +4,7 @@ API endpoints for stream analysis.
 
 import re
 from typing import Union
+from urllib.parse import urlparse, parse_qs
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 
@@ -19,6 +20,7 @@ router = APIRouter(prefix="/api", tags=["analysis"])
 def validate_manifest_url(url: str) -> tuple[bool, str, str]:
     """
     Validate manifest URL format and determine type.
+    Supports URLs with query parameters per TR-004.
 
     Args:
         url: The manifest URL to validate
@@ -28,16 +30,34 @@ def validate_manifest_url(url: str) -> tuple[bool, str, str]:
     """
     url_str = str(url)
 
-    # Check for valid extension
-    if url_str.endswith('.m3u8'):
+    # Parse URL to get path component (before query parameters)
+    try:
+        parsed_url = urlparse(url_str)
+        path = parsed_url.path
+    except Exception as e:
+        return False, '', f'Invalid URL format: {str(e)}'
+
+    # Check for valid extension on the path only (TR-004)
+    if path.endswith('.m3u8'):
         manifest_type = 'hls'
-    elif url_str.endswith('.mpd'):
+    elif path.endswith('.mpd'):
         manifest_type = 'dash'
     else:
-        return False, '', 'URL must end with .m3u8 (HLS) or .mpd (DASH)'
+        return False, '', 'URL path must end with .m3u8 (HLS) or .mpd (DASH)'
+
+    # Validate query parameters are well-formed (TR-004)
+    if parsed_url.query:
+        try:
+            # Parse query string to ensure it's well-formed
+            parse_qs(parsed_url.query, strict_parsing=True)
+        except ValueError as e:
+            return False, '', f'Malformed query parameters: {str(e)}'
 
     # Security check: Prevent SSRF attacks
-    # Block localhost, loopback, and private IP ranges
+    # Only check the hostname/netloc for private IPs, not query parameters
+    # This prevents false positives when query params contain encoded data
+    hostname = parsed_url.netloc.lower()
+
     blocked_patterns = [
         r'localhost',
         r'127\.0\.0\.',
@@ -51,7 +71,7 @@ def validate_manifest_url(url: str) -> tuple[bool, str, str]:
     ]
 
     for pattern in blocked_patterns:
-        if re.search(pattern, url_str, re.IGNORECASE):
+        if re.search(pattern, hostname, re.IGNORECASE):
             return False, '', 'Access to private/internal URLs is not allowed'
 
     return True, manifest_type, ''

@@ -3,12 +3,26 @@ Pydantic models for Stream-View API requests and responses.
 """
 
 from typing import List, Optional, Literal
-from pydantic import BaseModel, HttpUrl, Field
+from urllib.parse import urlparse
+from pydantic import BaseModel, HttpUrl, Field, field_validator
 
 
 class AnalyzeRequest(BaseModel):
     """Request model for stream analysis."""
     url: HttpUrl = Field(..., description="URL of the HLS (.m3u8) or DASH (.mpd) manifest")
+
+    @field_validator('url')
+    @classmethod
+    def validate_manifest_extension(cls, v):
+        """
+        Validate that the URL path ends with .m3u8 or .mpd (TR-004).
+        This provides early validation feedback to clients.
+        """
+        parsed = urlparse(str(v))
+        path = parsed.path
+        if not (path.endswith('.m3u8') or path.endswith('.mpd')):
+            raise ValueError('URL path must end with .m3u8 (HLS) or .mpd (DASH)')
+        return v
 
 
 class BitrateInfo(BaseModel):
