@@ -112,32 +112,66 @@ def parse_drm_info(root: ET.Element, namespaces: Dict[str, str]) -> Optional[DRM
     Returns:
         DRMInfo if DRM is detected, None otherwise
     """
-    # Look for ContentProtection elements
-    for cp in root.findall('.//ContentProtection', namespaces):
+    # Look for ContentProtection elements (try both with and without namespace)
+    content_protections = root.findall('.//mpd:ContentProtection', namespaces)
+    if not content_protections:
+        # Try without namespace prefix (some manifests don't use namespaces)
+        content_protections = root.findall('.//ContentProtection')
+
+    # First pass: collect key_id from any ContentProtection element
+    common_key_id = None
+    for cp in content_protections:
+        kid = (
+            cp.get('default_KID') or
+            cp.get('kid') or
+            cp.get('{urn:mpeg:cenc:2013}default_KID')
+        )
+        if kid:
+            common_key_id = kid
+            break
+
+    # Second pass: find specific DRM system
+    for cp in content_protections:
         scheme_id_uri = cp.get('schemeIdUri', '')
 
         # Determine DRM system
         drm_system = None
-        if 'widevine' in scheme_id_uri.lower():
+        scheme_id_lower = scheme_id_uri.lower()
+
+        # Check for Widevine (both by name and UUID)
+        if 'widevine' in scheme_id_lower or 'edef8ba9-79d6-4ace-a3c8-27dcd51d21ed' in scheme_id_lower:
             drm_system = 'Widevine'
-        elif 'playready' in scheme_id_uri.lower():
+        # Check for PlayReady (both by name and UUID)
+        elif 'playready' in scheme_id_lower or '9a04f079-9840-4286-ab92-e65be0885f95' in scheme_id_lower:
             drm_system = 'PlayReady'
-        elif 'fairplay' in scheme_id_uri.lower():
+        elif 'fairplay' in scheme_id_lower:
             drm_system = 'FairPlay'
-        elif 'clearkey' in scheme_id_uri.lower():
+        elif 'clearkey' in scheme_id_lower:
             drm_system = 'ClearKey'
-        elif scheme_id_uri:
-            drm_system = 'Unknown'
 
+        # If we found a specific DRM system (not generic CENC), extract info and return
         if drm_system:
-            # Extract key ID (often in cenc namespace)
-            key_id = cp.get('default_KID') or cp.get('kid')
+            # Extract key ID (check current element, or use common key_id)
+            key_id = (
+                cp.get('default_KID') or
+                cp.get('kid') or
+                cp.get('{urn:mpeg:cenc:2013}default_KID') or
+                common_key_id
+            )
 
-            # Look for PSSH box
+            # Look for PSSH box (try multiple approaches)
             pssh = None
-            pssh_elem = cp.find('.//cenc:pssh', namespaces)
-            if pssh_elem is not None and pssh_elem.text:
-                pssh = pssh_elem.text.strip()
+            # Try with cenc namespace if available
+            if 'cenc' in namespaces:
+                pssh_elem = cp.find('.//cenc:pssh', namespaces)
+                if pssh_elem is not None and pssh_elem.text:
+                    pssh = pssh_elem.text.strip()
+
+            # Try without namespace
+            if not pssh:
+                pssh_elem = cp.find('.//{urn:mpeg:cenc:2013}pssh')
+                if pssh_elem is not None and pssh_elem.text:
+                    pssh = pssh_elem.text.strip()
 
             # Look for license URL (mspr namespace for PlayReady)
             license_url = None

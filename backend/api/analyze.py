@@ -113,11 +113,29 @@ async def analyze_stream(request: AnalyzeRequest) -> Union[AnalyzeResponse, JSON
             result
         )
 
-        # Analyze video fragments with FFmpeg
-        video_metadata = await analyze_video_fragments(
-            result,
-            manifest_type
-        )
+        # Check if DRM is already detected from manifest
+        final_drm_info = result.get('drm_info')
+        video_metadata = []
+        ffmpeg_drm = None
+
+        # Only analyze video fragments if DRM was not detected in manifest
+        # This avoids long download times for DRM-protected content with large fragments
+        if not final_drm_info:
+            video_metadata, ffmpeg_drm = await analyze_video_fragments(
+                result,
+                manifest_type,
+                str(request.url)
+            )
+
+            # Use FFmpeg-detected DRM if available
+            if ffmpeg_drm:
+                from models.schemas import DRMInfo
+                final_drm_info = DRMInfo(
+                    system=ffmpeg_drm.get('system', 'Unknown'),
+                    key_id=None,
+                    license_url=None,
+                    pssh=None
+                )
 
         # Build response
         response = AnalyzeResponse(
@@ -127,7 +145,7 @@ async def analyze_stream(request: AnalyzeRequest) -> Union[AnalyzeResponse, JSON
             audio_tracks=result.get('audio_tracks', []),
             subtitle_tracks=result.get('subtitle_tracks', []),
             thumbnail_tracks=result.get('thumbnail_tracks', []),
-            drm_info=result.get('drm_info'),
+            drm_info=final_drm_info,
             scte35_markers=scte35_markers,
             video_metadata=video_metadata
         )

@@ -11,6 +11,7 @@ import tempfile
 import os
 from typing import List, Dict, Optional
 from pathlib import Path
+from urllib.parse import urljoin
 
 from models.schemas import VideoMetadata
 
@@ -61,14 +62,16 @@ def analyze_fragment_with_pyav(fragment_data: bytes) -> Dict:
     """
     Analyze video fragment using PyAV (FFmpeg).
 
+    Also detects DRM/encryption by attempting to decode the fragment.
+
     Args:
         fragment_data: Fragment binary data
 
     Returns:
-        Dictionary containing video metadata
+        Dictionary containing video metadata and encryption status
     """
     # Write fragment to temporary file
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.ts') as tmp_file:
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as tmp_file:
         tmp_file.write(fragment_data)
         tmp_path = tmp_file.name
 
@@ -79,7 +82,9 @@ def analyze_fragment_with_pyav(fragment_data: bytes) -> Dict:
         metadata = {
             'container_format': container.format.name,
             'duration': container.duration / av.time_base if container.duration else None,
-            'file_size': len(fragment_data)
+            'file_size': len(fragment_data),
+            'is_encrypted': False,
+            'drm_detected': None
         }
 
         # Find video stream
@@ -117,6 +122,42 @@ def analyze_fragment_with_pyav(fragment_data: bytes) -> Dict:
             if container.duration:
                 metadata['fragment_duration'] = container.duration / av.time_base
 
+            # Check for encryption by trying to decode a frame
+            try:
+                # Attempt to decode one frame
+                packet_count = 0
+                decoded_frame = False
+
+                for packet in container.demux(video_stream):
+                    packet_count += 1
+                    try:
+                        for frame in packet.decode():
+                            # Successfully decoded a frame
+                            decoded_frame = True
+                            break
+                    except Exception as decode_error:
+                        # Decode error might indicate encryption
+                        error_str = str(decode_error).lower()
+                        if any(term in error_str for term in ['decrypt', 'encrypted', 'drm', 'protection']):
+                            metadata['is_encrypted'] = True
+                            metadata['drm_detected'] = 'Unknown (encrypted)'
+                        break
+
+                    if decoded_frame or packet_count >= 5:
+                        break
+
+                # If we read packets but couldn't decode any frames, likely encrypted
+                if packet_count > 0 and not decoded_frame:
+                    metadata['is_encrypted'] = True
+                    metadata['drm_detected'] = 'Unknown (encrypted)'
+
+            except Exception as e:
+                # If we can't even read packets, check if it's encryption-related
+                error_str = str(e).lower()
+                if any(term in error_str for term in ['decrypt', 'encrypted', 'drm', 'protection', 'cenc']):
+                    metadata['is_encrypted'] = True
+                    metadata['drm_detected'] = 'Unknown (encrypted)'
+
         # Find audio stream
         audio_stream = None
         for stream in container.streams.audio:
@@ -133,7 +174,18 @@ def analyze_fragment_with_pyav(fragment_data: bytes) -> Dict:
         return metadata
 
     except Exception as e:
+        error_str = str(e).lower()
         print(f"Error analyzing fragment with PyAV: {e}")
+
+        # Check if error indicates encryption
+        if any(term in error_str for term in ['decrypt', 'encrypted', 'drm', 'protection', 'cenc']):
+            return {
+                'is_encrypted': True,
+                'drm_detected': 'Unknown (encrypted)',
+                'file_size': len(fragment_data),
+                'error': str(e)
+            }
+
         return {}
     finally:
         # Clean up temp file
@@ -143,12 +195,13 @@ def analyze_fragment_with_pyav(fragment_data: bytes) -> Dict:
             pass
 
 
-def get_hls_fragment_urls(parsed_data: Dict) -> Dict[int, List[str]]:
+def get_hls_fragment_urls(parsed_data: Dict, manifest_url: str) -> Dict[int, List[str]]:
     """
     Extract fragment URLs from HLS parsed data.
 
     Args:
         parsed_data: Parsed HLS manifest data
+        manifest_url: The manifest URL to resolve relative URLs
 
     Returns:
         Dictionary mapping bitrate level to list of fragment URLs
@@ -163,18 +216,20 @@ def get_hls_fragment_urls(parsed_data: Dict) -> Dict[int, List[str]]:
     for idx, variant in enumerate(playlist.playlists):
         if variant.uri:
             # This is a variant playlist - we'd need to fetch it to get actual segments
-            # For now, we'll just store the variant URL
-            fragment_urls[idx] = [variant.uri]
+            # Convert relative URL to absolute URL
+            absolute_url = urljoin(manifest_url, variant.uri)
+            fragment_urls[idx] = [absolute_url]
 
     return fragment_urls
 
 
-def get_dash_fragment_urls(parsed_data: Dict) -> Dict[int, List[str]]:
+def get_dash_fragment_urls(parsed_data: Dict, manifest_url: str) -> Dict[int, List[str]]:
     """
     Extract fragment URLs from DASH parsed data.
 
     Args:
         parsed_data: Parsed DASH manifest data
+        manifest_url: The manifest URL to resolve relative URLs
 
     Returns:
         Dictionary mapping bitrate level to list of fragment URLs
@@ -213,7 +268,10 @@ def get_dash_fragment_urls(parsed_data: Dict) -> Dict[int, List[str]]:
                 # Look for BaseURL
                 base_url_elem = representation.find('.//mpd:BaseURL', namespaces)
                 if base_url_elem is not None and base_url_elem.text:
-                    urls.append(base_url_elem.text.strip())
+                    relative_url = base_url_elem.text.strip()
+                    # Convert relative URL to absolute URL
+                    absolute_url = urljoin(manifest_url, relative_url)
+                    urls.append(absolute_url)
 
                 # Look for SegmentTemplate or SegmentList
                 # This would require more complex URL construction
@@ -227,25 +285,27 @@ def get_dash_fragment_urls(parsed_data: Dict) -> Dict[int, List[str]]:
     return fragment_urls
 
 
-async def analyze_video_fragments(parsed_data: Dict, manifest_type: str) -> List[VideoMetadata]:
+async def analyze_video_fragments(parsed_data: Dict, manifest_type: str, manifest_url: str = '') -> tuple[List[VideoMetadata], Optional[Dict]]:
     """
     Analyze video fragments using FFmpeg.
 
     Args:
         parsed_data: Parsed manifest data
         manifest_type: Type of manifest ('hls' or 'dash')
+        manifest_url: The manifest URL to resolve relative URLs
 
     Returns:
-        List of VideoMetadata objects
+        Tuple of (List of VideoMetadata objects, DRM info dict or None)
     """
     metadata_list = []
+    drm_info = None
 
     try:
         # Get fragment URLs based on manifest type
         if manifest_type == 'hls':
-            fragment_urls = get_hls_fragment_urls(parsed_data)
+            fragment_urls = get_hls_fragment_urls(parsed_data, manifest_url)
         else:
-            fragment_urls = get_dash_fragment_urls(parsed_data)
+            fragment_urls = get_dash_fragment_urls(parsed_data, manifest_url)
 
         # Analyze fragments for each bitrate level
         for level, urls in fragment_urls.items():
@@ -258,6 +318,13 @@ async def analyze_video_fragments(parsed_data: Dict, manifest_type: str) -> List
                     analysis = analyze_fragment_with_pyav(fragment_data)
 
                     if analysis:
+                        # Check if DRM was detected in fragment
+                        if analysis.get('is_encrypted') and not drm_info:
+                            drm_info = {
+                                'system': analysis.get('drm_detected', 'Unknown'),
+                                'detected_by': 'ffmpeg'
+                            }
+
                         # Create VideoMetadata object
                         metadata = VideoMetadata(
                             level=level,
@@ -279,4 +346,4 @@ async def analyze_video_fragments(parsed_data: Dict, manifest_type: str) -> List
     except Exception as e:
         print(f"Error analyzing video fragments: {e}")
 
-    return metadata_list
+    return metadata_list, drm_info
